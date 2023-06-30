@@ -38,7 +38,7 @@
 .code
     start: 
         mov ax, @data
-        mov ds, ax
+        mov ds, ax                               ;sadda==-a\\\\\sd
         
         mov cx, 5
         mov si, 0
