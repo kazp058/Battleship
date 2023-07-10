@@ -32,6 +32,11 @@
   CHAR_BOAT DB 33H
   CHAR_MISS DB 30H
   CHAR_FIRE DB 58H
+  
+  MSG_TITLE DB "BATALLA NAVAL", 0DH, 0AH
+            DB "TIENES 21 MISILES PARA DESTRUIR A LA FLOTA ENEMIGA", 0DH, 0AH
+            DB "PRESIONA ENTER PARA VISUALIZAR EL TABLERO Y UBICAR LOS BARCOS ALEATOREAMENTE..", 0DH, 0AH
+            DB 24H 
             
   MSG DB "N PARA SALIR", 0DH, 0AH
       DB "S PARA NUEVA PARTIDA", 0DH, 0AH
@@ -60,51 +65,39 @@
         ADD SIZE_CRUISER, 4
         ADD SIZE_SUBMARINE, 3
         
-        ADD SHAPE_POINTER, 33H
-        AND RANDOM, 0 
-;        
-;        CALL PUT_CARRIER
-;        MOV AX, POS_SHIP
-;        ADD POS_AIRCARRIER, AX 
-;        
-;        AND SHAPE_POINTER, 0
-;        ADD SHAPE_POINTER, 32H
-;        
-;        CALL PUT_SUBMARINE
-;        MOV AX, POS_SHIP
-;        ADD POS_SUBMARINE, AX
-;        
-;        AND SHAPE_POINTER, 0
-;        ADD SHAPE_POINTER, 31H
-;        
-;        CALL PUT_CRUISER
-;        MOV AX, POS_SHIP
-;        ADD POS_CRUISER, AX 
-;        
-;        CONTINUE_AFTER_PS:
-;        
-;        MOV AX, POS_AIRCARRIER
-;        MOV BX, POS_SUBMARINE 
-;        MOV CX, POS_CRUISER
-
-        ADD RANDOM, 1CH
-        CALL PUT_CARRIER
+        MOV AH, 09H
+        LEA DX, [MSG_TITLE]
+        INT 21H
         
-        AND SHAPE_POINTER, 0
-        ADD SHAPE_POINTER, 32H
-        
-        AND RANDOM, 0
-        ADD RANDOM, 19H
-        CALL PUT_SUBMARINE
-        
-        AND SHAPE_POINTER, 0
         ADD SHAPE_POINTER, 31H
+        AND RANDOM, 0 
         
-        AND RANDOM, 0
-        ADD RANDOM, 15H
-        CALL PUT_CRUISER        
+        CALL PUT_CARRIER
+        MOV AX, POS_SHIP
+        ADD POS_AIRCARRIER, AX 
         
+        AND SHAPE_POINTER, 0
+        ADD SHAPE_POINTER, 33H
         
+        CALL PUT_SUBMARINE
+        MOV AX, POS_SHIP
+        ADD POS_SUBMARINE, AX
+        
+        AND SHAPE_POINTER, 0
+        ADD SHAPE_POINTER, 35H
+        
+        CALL PUT_CRUISER
+        MOV AX, POS_SHIP
+        ADD POS_CRUISER, AX 
+        
+        CONTINUE_AFTER_PS:
+        
+        MOV AX, POS_AIRCARRIER
+        MOV BX, POS_SUBMARINE 
+        MOV CX, POS_CRUISER
+        
+
+
         JMP END
         
         PUT_SUBMARINE:
@@ -127,7 +120,7 @@
         
         
         PUT_SHIP:
-            ;CALL GET_RANDOM
+            CALL GET_RANDOM
             MOV AX, RANDOM
             AND POS_SHIP, 0
             ADD POS_SHIP, AX
@@ -140,7 +133,7 @@
             PUSH INDEX
             MOV CH, INDEX_X ;IZQUIERDA
             MOV CL, INDEX_X ;DERECHA
-            MOV DX, 1
+            MOV DH, 1
                        
             LOOP_X:
                 MOV DL, DH ;DH GUARDA EL NUMERO DE ELEMENTOS EN EL STACK EN LA ITERACION I
@@ -171,13 +164,15 @@
                     
                 CONTINUE_X:
                     MOV AH, SIZE_POINTER
-                    CMP DH, AH 
+                    CMP DH, AH
+                    
                     JA POP_DIFF
                     JE PUT_X  ;TERMINA LA REVISION Y COMIENZA A COLOCAR LOS VALORES EN EL MAPA
                     
                     MOV AH, DH
                     SUB AH, DL
                     CMP AH, 0
+                    MOV AL, DH
                     JE CLEAN_STACK
                     JNE LOOP_X 
                     
@@ -207,8 +202,7 @@
                         POP AX
                         CALL MAKE_INDEX 
                         MOV DH, SHAPE_POINTER 
-                        CALL SET_VAL_MAPS
-                        CALL PRINT_MAP
+                        CALL SET_VAL_MAP
                         CMP CL, 0
                         JZ END_PUT
                         DEC CL
@@ -239,7 +233,7 @@
             DEC AL 
             JNE LOOP_CS
         ENDLOOP_CS:
-        RET 
+        JMP PUT_SHIP 
                     
     CLEAR_SCREEN: ;LIMPIA LA PANTALLA
         MOV AX, 0003H
