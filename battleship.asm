@@ -17,9 +17,9 @@
   RANDOM DW 0
   LAST_RANDOM DW 0  
                  ;NONE  0 NONE   | 7 FIRED 
-  POS_AIRCARRIER DW 0 ; 1 HIDDEN | 2 FIRED
-  POS_CRUISER DW 0    ; 3 HIDDEN | 4 FIRED
-  POS_SUBMARINE DW 0  ; 5 HIDDEN | 6 FIRED
+  POS_AIRCARRIER DW 0   ; 1 HIDDEN | 2 FIRED
+  POS_SUBMARINE DW 0    ; 3 HIDDEN | 4 FIRED
+  POS_CRUISER DW 0      ; 5 HIDDEN | 6 FIRED      
   POS_SHIP DW 0 
   
   SIZE_AIRCARRIER DB 0
@@ -46,6 +46,9 @@
   MSG_SSUB DB "SUBMARINO HUNDIDO!", 0DH, 0AH, 24H
   MSG_SCRU DB "CRUCERO HUNDIDO!", 0DH, 0AH, 24H
   MSG_SACC DB "PORTAAVIONES HUNDIDO!", 0DH, 0AH, 24H 
+  
+  MSG_WIN DB "GANASTE, DESTRUISTE TODOS LOS BARCOS ENEMIGOS!", 0DH, 0AH, 24H
+  MSG_LOST DB "PERDISTE, TE QUEDASTE SIN MISILES!", 0DH, 0AH, 24H
   
   MSG_TITLE DB "BATALLA NAVAL", 0DH, 0AH
             DB "TIENES 21 MISILES PARA DESTRUIR A LA FLOTA ENEMIGA", 0DH, 0AH
@@ -120,16 +123,17 @@
         MOV CX, POS_CRUISER
         
         RELOAD:
-;            MOV AX, 0003H
-;            INT 10H
             CALL PRINT_MAP
         
         ASK:
             MOV BX, offset MSG_MISSILE
             MOV AX, QTY_MISSILE
-            ADD AX, 30H
-            MOV [BX+8],30H
-            MOV [BX+9],AL 
+            MOV DH, 0AH
+            DIV DH
+            ADD AL, 30H
+            ADD AH, 30H
+            MOV [BX+8],AL
+            MOV [BX+9],AH 
             MOV DX, BX
             MOV AH, 09H
             INT 21H
@@ -172,22 +176,29 @@
         CMP AL, 0   ;IMPACTO AL AGUA
         JE WATER_SHOT
         
-        CMP AL, 1   ;IMPACTO A SUBMARINO
-        JE SUB_SHOT
-        
-        CMP AL, 3   ;IMPACTO A CRUCERO
-        JE CRU_SHOT
-        
-        CMP AL, 5   ;IMPACTO A PORTAAVIONES
+        CMP AL, 1   ;IMPACTO A PORTAAVIONES
         JE ACC_SHOT
+        
+        CMP AL, 3   ;IMPACTO A SUBMARINO
+        JE SUB_SHOT      
+        
+        CMP AL, 5   ;IMPACTO A CRUCERO    
+        JE CRU_SHOT
         
         JMP CHANGE
 
         AFTER_SHOT:
+
+        MOV AL, SIZE_AIRCARRIER
+        ADD AL, SIZE_CRUISER
+        ADD AL, SIZE_SUBMARINE
+        
+        CMP AL, 0
+        JE END_WIN
         
         CMP QTY_MISSILE, 21
-        
-        JE END
+
+        JE END_LOST
         INC QTY_MISSILE      
         
         JMP RELOAD
@@ -275,7 +286,7 @@
                         POP AX
                         CALL MAKE_INDEX 
                         MOV DH, SHAPE_POINTER 
-                        CALL SET_VAL_MAP
+                        CALL SET_VAL_MAPS
                         CMP CL, 0
                         JZ END_PUT
                         DEC CL
@@ -304,7 +315,7 @@
         MOV DH, CHAR_MISS 
         CALL SET_VAL_GAMEMAP
         
-        MOV DH, 7
+        MOV DH, 37H
         CALL SET_VAL_MAP
         JMP AFTER_SHOT
     
@@ -316,7 +327,7 @@
         MOV DH, CHAR_FIRE 
         CALL SET_VAL_GAMEMAP
         
-        MOV DH, 6
+        MOV DH, 36H
         CALL SET_VAL_MAP
         DEC SIZE_SUBMARINE
         CMP SIZE_SUBMARINE, 0
@@ -336,7 +347,7 @@
         MOV DH, CHAR_FIRE 
         CALL SET_VAL_GAMEMAP
         
-        MOV DH, 4
+        MOV DH, 34H
         CALL SET_VAL_MAP
         DEC SIZE_CRUISER
         CMP SIZE_CRUISER, 0
@@ -356,9 +367,9 @@
         MOV DH, CHAR_FIRE 
         CALL SET_VAL_GAMEMAP
         
-        MOV DH, 2
+        MOV DH, 32H
         CALL SET_VAL_MAP
-        DEC SIZE_AIRCARRIER
+        DEC SIZE_AIRCARRIER 
         CMP SIZE_AIRCARRIER, 0
         JE SUNK_ACC
         JMP AFTER_SHOT
@@ -367,33 +378,7 @@
             LEA DX, [MSG_SACC]
             INT 21H
             JMP AFTER_SHOT
-    
-    convertir:
-        mov bl, 10   ;mueve 10 a bl
-        div bl       ;divide el contenido de ax para 10, el cociente se guarda en al y el residuo en ah
-        mov dh, ah   ;mueve el contenido de ah a dh  
-        mov dl, al   ;mueve 0 a ah
-        mov ah, 00h  ;mueve el contenido de dh a al
-        mov al, dh   ;mueve el contenido de dh a al
-        push ax      ;guarda el contenido de ax en la pila
-        mov ax, 0000h;guarda 0 en ax
-        mov al, dl   ;guarda el cociente de la division en al
-        add cx, 1
-        cmp dl, 0    ;verifica si el cociente es 0
-        jnz convertir;si no se cumple lo anterior regresa a la etiqueta convertir
-        jz  mostrar  ;si dl es igual a 0 salta a la etiqueta mostrar
 
-    mostrar:
-        sub cx, 1    ;decrementa cx en 1
-        pop ax       ;retira el ultimo valor ingresado en la pila y lo guarda en ax
-        mov ah, 02h  ;se coloca 02h en ah (funcion)
-        mov dl, al   ;se guarda el contenido de al en dl
-        add dl, 30h  ;se suma 30h a dl para obtener el caracter ascii correcto
-        int 21h      ;se llama a interrupcion 21h para mostrar el caracter por pantalla
-        cmp cx, 1    ;verifica si el contador llego a 1
-        jnz mostrar  ;si lo anterior no se cumple, salta a la etiqueta mostrar
-        ret
-    
     ;FUNCIONES DE MAPA
         
     PRINT_MAP: ;IMPRIME EL MAPA DEL JUEGO
@@ -548,4 +533,15 @@
         ADD RANDOM, AX
         RET
         
-    END:   
+    END_INTE:
+    
+    END_WIN:
+    
+    END_LOST:
+        MOV AL, SIZE_SUBMARINE
+        MOV BL, SIZE_CRUISER
+        MOV CL, SIZE_AIRCARRIER
+        JMP END
+    
+    END:
+       
