@@ -26,6 +26,9 @@
   SIZE_CRUISER DB 0
   SIZE_SUBMARINE DB 0
   
+  SIZE_POINTER DB 0
+  SHAPE_POINTER DB 0
+  
   CHAR_BOAT DB 33H
   CHAR_MISS DB 30H
   CHAR_FIRE DB 58H
@@ -57,10 +60,77 @@
         ADD SIZE_CRUISER, 4
         ADD SIZE_SUBMARINE, 3
         
+        ADD SHAPE_POINTER, 33H
+        AND RANDOM, 0 
+;        
+;        CALL PUT_CARRIER
+;        MOV AX, POS_SHIP
+;        ADD POS_AIRCARRIER, AX 
+;        
+;        AND SHAPE_POINTER, 0
+;        ADD SHAPE_POINTER, 32H
+;        
+;        CALL PUT_SUBMARINE
+;        MOV AX, POS_SHIP
+;        ADD POS_SUBMARINE, AX
+;        
+;        AND SHAPE_POINTER, 0
+;        ADD SHAPE_POINTER, 31H
+;        
+;        CALL PUT_CRUISER
+;        MOV AX, POS_SHIP
+;        ADD POS_CRUISER, AX 
+;        
+;        CONTINUE_AFTER_PS:
+;        
+;        MOV AX, POS_AIRCARRIER
+;        MOV BX, POS_SUBMARINE 
+;        MOV CX, POS_CRUISER
+
+        ADD RANDOM, 1CH
+        CALL PUT_CARRIER
+        
+        AND SHAPE_POINTER, 0
+        ADD SHAPE_POINTER, 32H
+        
+        AND RANDOM, 0
+        ADD RANDOM, 19H
+        CALL PUT_SUBMARINE
+        
+        AND SHAPE_POINTER, 0
+        ADD SHAPE_POINTER, 31H
+        
+        AND RANDOM, 0
+        ADD RANDOM, 15H
+        CALL PUT_CRUISER        
+        
+        
+        JMP END
+        
+        PUT_SUBMARINE:
+            AND SIZE_POINTER, 0
+            MOV AL, SIZE_SUBMARINE
+            ADD SIZE_POINTER, AL
+            JMP PUT_SHIP
+        
+        PUT_CARRIER:
+            AND SIZE_POINTER, 0
+            MOV AL, SIZE_AIRCARRIER
+            ADD SIZE_POINTER, AL
+            JMP PUT_SHIP
+        
+        PUT_CRUISER:
+            AND SIZE_POINTER, 0
+            MOV AL, SIZE_CRUISER
+            ADD SIZE_POINTER, AL
+            JMP PUT_SHIP
+        
+        
         PUT_SHIP:
-            CALL GET_RANDOM
-            ;ADD RANDOM, 12
+            ;CALL GET_RANDOM
             MOV AX, RANDOM
+            AND POS_SHIP, 0
+            ADD POS_SHIP, AX
             CALL MAKE_INDEX
             
             
@@ -68,12 +138,13 @@
             CMP AL, 0
             JNZ PUT_SHIP
             PUSH INDEX
-            MOV CH, INDEX_X
-            MOV CL, INDEX_X
+            MOV CH, INDEX_X ;IZQUIERDA
+            MOV CL, INDEX_X ;DERECHA
+            MOV DX, 1
                        
-            LOOP_X:     
-                
-                REV_IZQ:
+            LOOP_X:
+                MOV DL, DH ;DH GUARDA EL NUMERO DE ELEMENTOS EN EL STACK EN LA ITERACION I
+                REV_IZQ:   ;DL GUARDA EL NUMERO DE ELEMENTOS EN EL STACK EN LA ITERACION I-1
                     CMP CH, 0
                     JE REV_DER
                     DEC CH
@@ -82,6 +153,7 @@
                     CALL GET_VAL_MAP
                     CMP AL, 0
                     JNZ REV_DER
+                    ADD DH, 1
                     PUSH INDEX
                     
                     
@@ -94,54 +166,58 @@
                     CALL GET_VAL_MAP
                     CMP AL, 0
                     JNZ CONTINUE_X
+                    ADD DH, 1
                     PUSH INDEX
                     
                 CONTINUE_X:
-                    MOV AH, CH
-                    MOV AL, CL
-                    SUB AL, AH
-                    MOV AH, SIZE_AIRCARRIER
-                    DEC AH
-                    CMP AL, AH 
-                    JAE PUT_X  ;TERMINA LA REVISION Y COMIENZA A COLOCAR LOS VALORES EN EL MAPA
+                    MOV AH, SIZE_POINTER
+                    CMP DH, AH 
+                    JA POP_DIFF
+                    JE PUT_X  ;TERMINA LA REVISION Y COMIENZA A COLOCAR LOS VALORES EN EL MAPA
                     
-                    MOV DL, 0  ;CONTINUA LA REVISION                  
-                    CMP CH, 0
-                    JE  NEXT_CHECK
-                    ADD DL, 1
+                    MOV AH, DH
+                    SUB AH, DL
+                    CMP AH, 0
+                    JE CLEAN_STACK
+                    JNE LOOP_X 
                     
-                    NEXT_CHECK:
-                    CMP CL, 6
-                    JE FINAL_CHECK 
-                    ADD DL, 2
-                    
-                    FINAL_CHECK:
-                    CMP DL, 3
-                    JNE LOOP_X
-                    JE PUT_SHIP
+;                    MOV DL, 0  ;REVISA SI SE ALCANZO EL MINIMO HACIA LA IZQ                  
+;                    CMP CH, 0
+;                    JNE  NEXT_CHECK
+;                    ADD DL, 1
+;                    
+;                    NEXT_CHECK:
+;                    CMP CL, 6 ;REVISA SI SE ALCANZO EL MAXIMO HACIA LA DER
+;                    JNE FINAL_CHECK 
+;                    ADD DL, 2
+;                    
+;                    FINAL_CHECK:
+;                    MOV AL, CL
+;                    SUB AL, CH
+;                    DEC AL
+;                    CMP DH, 3
+;                    JE CLEAN_STACK
+;                    CMP DL, 3
+;                    JNE LOOP_X                    
                     
                 PUT_X:                      
-                    MOV CL, SIZE_AIRCARRIER
+                    MOV CL, SIZE_POINTER
                     LOOP_PUT_X:
                         AND INDEX, 0
                         POP AX
                         CALL MAKE_INDEX 
-                        MOV DH, CHAR_BOAT 
+                        MOV DH, SHAPE_POINTER 
                         CALL SET_VAL_MAPS
                         CALL PRINT_MAP
                         CMP CL, 0
                         JZ END_PUT
                         DEC CL
                         JA LOOP_PUT_X                                    
+            
                 
-            ;PRE_LOOP_Y:
-            ;MOV AX, 0
-            
-            
-         END_PUT:
-                                                             
-        
-        JMP END
+                    
+            END_PUT:
+            RET
     
     ;FUNCIONES DE MAPA
         
@@ -150,7 +226,21 @@
         LEA DX, [GAME_MAP]
         INT 21H
         RET
-    
+        
+    POP_DIFF:
+        POP AX
+        JMP PUT_X
+        
+    CLEAN_STACK: ;LIMPIA EL STACK, HACIENDO POP AL VECES
+        LOOP_CS:
+            POP BX
+            CMP AL, 0
+            JE ENDLOOP_CS
+            DEC AL 
+            JNE LOOP_CS
+        ENDLOOP_CS:
+        RET 
+                    
     CLEAR_SCREEN: ;LIMPIA LA PANTALLA
         MOV AX, 0003H
         INT 10H
@@ -215,19 +305,20 @@
         RET
     
     MAKE_INDEX:    ;CONVIERTE EL INDICE EN AX EN COORDENADAS X Y Y.
-        LOOP_CONVERT:
-            CMP AL, 7
-            JB CONTINUE_CONVERT
-            MOV BH, 7
-            DIV BH
-            MOV BL, AL
-            JAE LOOP_CONVERT
+        CMP AL, 7
+        JB CONTINUE_CONVERT
+        MOV BH, 7
+        DIV BH
+        MOV BH, AL
+        MOV AL, AH
+        DEC AH
+        MOV AH, BH
         CONTINUE_CONVERT:
         AND INDEX_X, 0
         AND INDEX_Y, 0
         
-        ADD INDEX_X, AH
-        ADD INDEX_Y, AL
+        ADD INDEX_X, AL
+        ADD INDEX_Y, AH
         RET
     
     ;FUNCIONES DE NUMERO ALEATORIO
