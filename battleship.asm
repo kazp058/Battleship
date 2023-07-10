@@ -43,6 +43,10 @@
   MSG_INVALID DB "..........ENTRADA NO VALIDA",0DH,0AH,24H
   MSG_USED DB "..........ELIJE OTRA CELDA A DISPARAR", 0DH,0AH,24H
   
+  MSG_SSUB DB "SUBMARINO HUNDIDO!", 0DH, 0AH, 24H
+  MSG_SCRU DB "CRUCERO HUNDIDO!", 0DH, 0AH, 24H
+  MSG_SACC DB "PORTAAVIONES HUNDIDO!", 0DH, 0AH, 24H 
+  
   MSG_TITLE DB "BATALLA NAVAL", 0DH, 0AH
             DB "TIENES 21 MISILES PARA DESTRUIR A LA FLOTA ENEMIGA", 0DH, 0AH
             DB "PRESIONA ENTER PARA VISUALIZAR EL TABLERO Y UBICAR LOS BARCOS ALEATOREAMENTE..", 0DH, 0AH
@@ -108,7 +112,7 @@
         ADD POS_CRUISER, AX 
         
         
-        ADD QTY_MISSILE, 20
+        ADD QTY_MISSILE, 1
         CONTINUE_AFTER_PS:
         
         MOV AX, POS_AIRCARRIER
@@ -123,9 +127,9 @@
         ASK:
             MOV BX, offset MSG_MISSILE
             MOV AX, QTY_MISSILE
-            ADD AX, 31H
+            ADD AX, 30H
             MOV [BX+8],30H
-            MOV [BX+9],AX 
+            MOV [BX+9],AL 
             MOV DX, BX
             MOV AH, 09H
             INT 21H
@@ -133,7 +137,11 @@
             MOV AH, 09H
             LEA DX, MSG_ASK
             INT 21H
-            
+             
+            MOV BL, SIZE_SUBMARINE
+            MOV CL, SIZE_CRUISER
+            MOV DL, SIZE_AIRCARRIER 
+             
             MOV AH, 01H
             INT 21H
             MOV BH, AL
@@ -172,6 +180,8 @@
         
         CMP AL, 5   ;IMPACTO A PORTAAVIONES
         JE ACC_SHOT
+        
+        JMP CHANGE
 
         AFTER_SHOT:
         
@@ -256,26 +266,7 @@
                     CMP AH, 0
                     MOV AL, DH
                     JE CLEAN_STACK
-                    JNE LOOP_X 
-                    
-;                    MOV DL, 0  ;REVISA SI SE ALCANZO EL MINIMO HACIA LA IZQ                  
-;                    CMP CH, 0
-;                    JNE  NEXT_CHECK
-;                    ADD DL, 1
-;                    
-;                    NEXT_CHECK:
-;                    CMP CL, 6 ;REVISA SI SE ALCANZO EL MAXIMO HACIA LA DER
-;                    JNE FINAL_CHECK 
-;                    ADD DL, 2
-;                    
-;                    FINAL_CHECK:
-;                    MOV AL, CL
-;                    SUB AL, CH
-;                    DEC AL
-;                    CMP DH, 3
-;                    JE CLEAN_STACK
-;                    CMP DL, 3
-;                    JNE LOOP_X                    
+                    JNE LOOP_X                    
                     
                 PUT_X:                      
                     MOV CL, SIZE_POINTER
@@ -290,14 +281,18 @@
                         DEC CL
                         JA LOOP_PUT_X                                    
             
-                
-                    
             END_PUT:
             RET
     
     INVALID:
         MOV AH, 09H
         LEA DX, [MSG_INVALID]
+        INT 21H
+        JMP ASK
+        
+    CHANGE:
+        MOV AH, 09H
+        LEA DX, [MSG_USED]
         INT 21H
         JMP ASK
         
@@ -323,7 +318,15 @@
         
         MOV DH, 6
         CALL SET_VAL_MAP
+        DEC SIZE_SUBMARINE
+        CMP SIZE_SUBMARINE, 0
+        JE SUNK_SUB
         JMP AFTER_SHOT
+        SUNK_SUB:
+            MOV AH, 09H
+            LEA DX, [MSG_SSUB]
+            INT 21H
+            JMP AFTER_SHOT
     
     CRU_SHOT:
         MOV AH, 09H
@@ -335,7 +338,15 @@
         
         MOV DH, 4
         CALL SET_VAL_MAP
+        DEC SIZE_CRUISER
+        CMP SIZE_CRUISER, 0
+        JE SUNK_CRU
         JMP AFTER_SHOT
+        SUNK_CRU:
+            MOV AH, 09H
+            LEA DX, [MSG_SCRU]
+            INT 21H
+            JMP AFTER_SHOT
     
     ACC_SHOT:    
         MOV AH, 09H
@@ -347,7 +358,15 @@
         
         MOV DH, 2
         CALL SET_VAL_MAP
+        DEC SIZE_AIRCARRIER
+        CMP SIZE_AIRCARRIER, 0
+        JE SUNK_ACC
         JMP AFTER_SHOT
+        SUNK_ACC:
+            MOV AH, 09H
+            LEA DX, [MSG_SACC]
+            INT 21H
+            JMP AFTER_SHOT
     
     convertir:
         mov bl, 10   ;mueve 10 a bl
