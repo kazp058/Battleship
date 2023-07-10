@@ -20,7 +20,7 @@
   POS_AIRCARRIER DW 0 ; 1 HIDDEN | 2 FIRED
   POS_CRUISER DW 0    ; 3 HIDDEN | 4 FIRED
   POS_SUBMARINE DW 0  ; 5 HIDDEN | 6 FIRED
-  POS_SHIP DW 0
+  POS_SHIP DW 0 
   
   SIZE_AIRCARRIER DB 0
   SIZE_CRUISER DB 0
@@ -31,7 +31,17 @@
   
   CHAR_BOAT DB 33H
   CHAR_MISS DB 30H
-  CHAR_FIRE DB 58H
+  CHAR_FIRE DB 31H
+  
+  QTY_MISSILE DW 0
+  
+  MSG_MISSILE DB 0DH, 0AH, "MISIL   ", 24H
+  MSG_ASK DB ", INGRESE LA CELDA A ATACAR: ", 24H
+  
+  MSG_IMPACT DB "..........IMPACTO CONFIRMADO", 0DH, 0AH, 24H
+  MSG_NIMPACT DB "..........SIN IMPACTO", 0DH, 0AH, 24H
+  MSG_INVALID DB "..........ENTRADA NO VALIDA",0DH,0AH,24H
+  MSG_USED DB "..........ELIJE OTRA CELDA A DISPARAR", 0DH,0AH,24H
   
   MSG_TITLE DB "BATALLA NAVAL", 0DH, 0AH
             DB "TIENES 21 MISILES PARA DESTRUIR A LA FLOTA ENEMIGA", 0DH, 0AH
@@ -60,14 +70,21 @@
     START:
         MOV AX, @DATA
         MOV DS, AX
-        
+                
         ADD SIZE_AIRCARRIER, 5
         ADD SIZE_CRUISER, 4
         ADD SIZE_SUBMARINE, 3
-        
+
+        WAIT_FOR_ENTER:
+        MOV AX, 0003H
+        INT 10H
         MOV AH, 09H
         LEA DX, [MSG_TITLE]
         INT 21H
+        MOV AH, 01H
+        INT 21H
+        CMP AL, 0DH
+        JNE WAIT_FOR_ENTER
         
         ADD SHAPE_POINTER, 31H
         AND RANDOM, 0 
@@ -90,15 +107,80 @@
         MOV AX, POS_SHIP
         ADD POS_CRUISER, AX 
         
+        
+        ADD QTY_MISSILE, 20
         CONTINUE_AFTER_PS:
         
         MOV AX, POS_AIRCARRIER
         MOV BX, POS_SUBMARINE 
         MOV CX, POS_CRUISER
         
+        RELOAD:
+;            MOV AX, 0003H
+;            INT 10H
+            CALL PRINT_MAP
+        
+        ASK:
+            MOV BX, offset MSG_MISSILE
+            MOV AX, QTY_MISSILE
+            ADD AX, 31H
+            MOV [BX+8],30H
+            MOV [BX+9],AX 
+            MOV DX, BX
+            MOV AH, 09H
+            INT 21H
+            
+            MOV AH, 09H
+            LEA DX, MSG_ASK
+            INT 21H
+            
+            MOV AH, 01H
+            INT 21H
+            MOV BH, AL
+            MOV AH, 01H
+            INT 21H
+            MOV BL, AL
+        
+        CMP BH, 41H
+        JB INVALID
+        CMP BH, 47H
+        JA INVALID
+        
+        CMP BL, 31H
+        JB INVALID
+        CMP BL, 37H
+        JA INVALID
+        
+        SUB BH, 41H
+        SUB BL, 31H 
+                
+        AND INDEX_X, 0
+        AND INDEX_Y, 0
+        ADD INDEX_X, BH
+        ADD INDEX_Y, BL
+        
+        CALL GET_VAL_MAP
+        
+        CMP AL, 0   ;IMPACTO AL AGUA
+        JE WATER_SHOT
+        
+        CMP AL, 1   ;IMPACTO A SUBMARINO
+        JE SUB_SHOT
+        
+        CMP AL, 3   ;IMPACTO A CRUCERO
+        JE CRU_SHOT
+        
+        CMP AL, 5   ;IMPACTO A PORTAAVIONES
+        JE ACC_SHOT
 
-
-        JMP END
+        AFTER_SHOT:
+        
+        CMP QTY_MISSILE, 21
+        
+        JE END
+        INC QTY_MISSILE      
+        
+        JMP RELOAD
         
         PUT_SUBMARINE:
             AND SIZE_POINTER, 0
@@ -212,6 +294,86 @@
                     
             END_PUT:
             RET
+    
+    INVALID:
+        MOV AH, 09H
+        LEA DX, [MSG_INVALID]
+        INT 21H
+        JMP ASK
+        
+    WATER_SHOT:
+        MOV AH, 09H
+        LEA DX, [MSG_NIMPACT]
+        INT 21H
+        
+        MOV DH, CHAR_MISS 
+        CALL SET_VAL_GAMEMAP
+        
+        MOV DH, 7
+        CALL SET_VAL_MAP
+        JMP AFTER_SHOT
+    
+    SUB_SHOT:
+        MOV AH, 09H
+        LEA DX, [MSG_IMPACT]
+        INT 21H
+        
+        MOV DH, CHAR_FIRE 
+        CALL SET_VAL_GAMEMAP
+        
+        MOV DH, 6
+        CALL SET_VAL_MAP
+        JMP AFTER_SHOT
+    
+    CRU_SHOT:
+        MOV AH, 09H
+        LEA DX, [MSG_IMPACT]
+        INT 21H
+        
+        MOV DH, CHAR_FIRE 
+        CALL SET_VAL_GAMEMAP
+        
+        MOV DH, 4
+        CALL SET_VAL_MAP
+        JMP AFTER_SHOT
+    
+    ACC_SHOT:    
+        MOV AH, 09H
+        LEA DX, [MSG_IMPACT]
+        INT 21H
+        
+        MOV DH, CHAR_FIRE 
+        CALL SET_VAL_GAMEMAP
+        
+        MOV DH, 2
+        CALL SET_VAL_MAP
+        JMP AFTER_SHOT
+    
+    convertir:
+        mov bl, 10   ;mueve 10 a bl
+        div bl       ;divide el contenido de ax para 10, el cociente se guarda en al y el residuo en ah
+        mov dh, ah   ;mueve el contenido de ah a dh  
+        mov dl, al   ;mueve 0 a ah
+        mov ah, 00h  ;mueve el contenido de dh a al
+        mov al, dh   ;mueve el contenido de dh a al
+        push ax      ;guarda el contenido de ax en la pila
+        mov ax, 0000h;guarda 0 en ax
+        mov al, dl   ;guarda el cociente de la division en al
+        add cx, 1
+        cmp dl, 0    ;verifica si el cociente es 0
+        jnz convertir;si no se cumple lo anterior regresa a la etiqueta convertir
+        jz  mostrar  ;si dl es igual a 0 salta a la etiqueta mostrar
+
+    mostrar:
+        sub cx, 1    ;decrementa cx en 1
+        pop ax       ;retira el ultimo valor ingresado en la pila y lo guarda en ax
+        mov ah, 02h  ;se coloca 02h en ah (funcion)
+        mov dl, al   ;se guarda el contenido de al en dl
+        add dl, 30h  ;se suma 30h a dl para obtener el caracter ascii correcto
+        int 21h      ;se llama a interrupcion 21h para mostrar el caracter por pantalla
+        cmp cx, 1    ;verifica si el contador llego a 1
+        jnz mostrar  ;si lo anterior no se cumple, salta a la etiqueta mostrar
+        ret
     
     ;FUNCIONES DE MAPA
         
