@@ -22,6 +22,10 @@
   POS_SUBMARINE DW 0  ; 5 HIDDEN | 6 FIRED
   POS_SHIP DW 0
   
+  SIZE_AIRCARRIER DB 0
+  SIZE_CRUISER DB 0
+  SIZE_SUBMARINE DB 0
+  
   CHAR_BOAT DB 33H
   CHAR_MISS DB 30H
   CHAR_FIRE DB 58H
@@ -30,8 +34,8 @@
       DB "S PARA NUEVA PARTIDA", 0DH, 0AH
       DB "JUGAR DE NUEVO? (S/N):",0DH, 0AH, 24H
   
-  MAP DB 69 DUP('$')
-  MAP_PRINT DB "X-------------------------------X", 0DH, 0AH
+  MAP DB 69 DUP('0')
+  GAME_MAP  DB "X-------------------------------X", 0DH, 0AH
             DB "|   | A | B | C | D | E | F | G |", 0DH, 0AH
             DB "| 1 | . | . | . | . | . | . | . |", 0DH, 0AH
             DB "| 2 | . | . | . | . | . | . | . |", 0DH, 0AH
@@ -44,241 +48,210 @@
             DB 24H
             
 .CODE
-    START: 
+
+    START:
         MOV AX, @DATA
         MOV DS, AX
         
-        CALL GET_RANDOM_SEED
-        MOV AX, RANDOM
-        ADD  POS_AIRCARRIER, AX
-        CALL MAKE_INDEX
+        ADD SIZE_AIRCARRIER, 5
+        ADD SIZE_CRUISER, 4
+        ADD SIZE_SUBMARINE, 3
         
-        MOV DH, CHAR_BOAT 
-        CALL CHANGE_VAL_GAMEMAP
-        
-        CALL PRINT_MAP   
+        PUT_SHIP:
+            CALL GET_RANDOM
+            ;ADD RANDOM, 12
+            MOV AX, RANDOM
+            CALL MAKE_INDEX
+            
+            
+            CALL GET_VAL_MAP
+            CMP AL, 0
+            JNZ PUT_SHIP
+            PUSH INDEX
+            MOV CH, INDEX_X
+            MOV CL, INDEX_X
+                       
+            LOOP_X:     
+                
+                REV_IZQ:
+                    CMP CH, 0
+                    JE REV_DER
+                    DEC CH
+                    AND INDEX_X, 0
+                    ADD INDEX_X, CH
+                    CALL GET_VAL_MAP
+                    CMP AL, 0
+                    JNZ REV_DER
+                    PUSH INDEX
+                    
+                    
+                REV_DER:
+                    CMP CL, 6
+                    JE CONTINUE_X
+                    INC CL
+                    AND INDEX_X, 0
+                    ADD INDEX_X, CL
+                    CALL GET_VAL_MAP
+                    CMP AL, 0
+                    JNZ CONTINUE_X
+                    PUSH INDEX
+                    
+                CONTINUE_X:
+                    MOV AH, CH
+                    MOV AL, CL
+                    SUB AL, AH
+                    MOV AH, SIZE_AIRCARRIER
+                    DEC AH
+                    CMP AL, AH 
+                    JAE PUT_X  ;TERMINA LA REVISION Y COMIENZA A COLOCAR LOS VALORES EN EL MAPA
+                    
+                    MOV DL, 0  ;CONTINUA LA REVISION                  
+                    CMP CH, 0
+                    JE  NEXT_CHECK
+                    ADD DL, 1
+                    
+                    NEXT_CHECK:
+                    CMP CL, 6
+                    JE FINAL_CHECK 
+                    ADD DL, 2
+                    
+                    FINAL_CHECK:
+                    CMP DL, 3
+                    JNE LOOP_X
+                    JE PUT_SHIP
+                    
+                PUT_X:                      
+                    MOV CL, SIZE_AIRCARRIER
+                    LOOP_PUT_X:
+                        AND INDEX, 0
+                        POP AX
+                        CALL MAKE_INDEX 
+                        MOV DH, CHAR_BOAT 
+                        CALL SET_VAL_MAPS
+                        CALL PRINT_MAP
+                        CMP CL, 0
+                        JZ END_PUT
+                        DEC CL
+                        JA LOOP_PUT_X                                    
+                
+            ;PRE_LOOP_Y:
+            ;MOV AX, 0
+            
+            
+         END_PUT:
+                                                             
         
         JMP END
-     
-     PRINT_MAP:
+    
+    ;FUNCIONES DE MAPA
+        
+    PRINT_MAP: ;IMPRIME EL MAPA DEL JUEGO
         MOV AH, 09H
-        LEA DX, [MAP_PRINT]
+        LEA DX, [GAME_MAP]
         INT 21H
         RET
-        
-     CHECK_VAL:
-        MOV AL, INDEX_X
-        MOV BL, INDEX_Y
-           
-     
-     PUT_SHIP:
-        MOV AX, POS_SHIP
-        
-        MOV BX, INDEX
-        XOR INDEX, BX  
-        
-        ADD INDEX,AX
-        
-        CALL MAKE_INDEX
-        
-        CMP INDEX_X, DL
-        JAE CHECK_AC_LEFT
-        JB  CHECK_AC_RIGHT
-        
-        REGEN_RANDOM:
-            CALL GET_RANDOM_SEED
-            JMP PUT_SHIP  
-        
-        CHECK_AC_LEFT:
-            MOV CL, INDEX_X
-            
-            LOOP_AC_LEFT:
-                MOV BH, INDEX_X
-                XOR INDEX_X, BH
-                
-                ADD INDEX_X, CL
-                
-                CALL CHECK_VAL 
-                
-                MOV DH, CL
-                SUB DH, DL
-                              
-                CMP BL, 0
-                JNE CHECK_AC_RIGHT
-                
-                CMP CL, 0
-                JE AC_PUT_LEFT
-                
-                CMP BL, 0
-                DEC CL
-                JE LOOP_AC_LEFT 
-                        
-            AC_PUT_LEFT:
-                MOV CH, 00
-                MOV CX, POS_SHIP
-                
-                AC_PUT_LEFT_LOOP:
-                    MOV BX, INDEX
-                    XOR INDEX, BX
-                    
-                    ADD INDEX, CX
-                    CALL MAKE_INDEX
-                    
-                    CALL CHANGE_VAL_MAP 
-                    
-                    CALL GET_INDEX_GAMEMAP 
-                    CALL CHANGE_VAL_GAMEMAP
-                    CMP CL, 0
-                
-                    JE END_PUT
-                    DEC CL
-                    JNE AC_PUT_LEFT_LOOP 
-
-        CHECK_AC_RIGHT:
-            MOV CL, INDEX_X
-            
-            LOOP_AC_RIGHT:
-                MOV BH, INDEX_X
-                XOR INDEX_X, BX
-                
-                ADD INDEX_X, CL
-                
-                CALL CHECK_VAL
-                
-                MOV DH, DL
-                SUB DH, CL
-                
-                CMP BL, 0
-                JNE CHECK_AC_UP
-                
-                CMP CL, 0
-                JE AC_PUT_RIGHT
-                
-                CMP BL, 0
-        
-        JMP CONTINUE_PUT_AC 
-        
-        CONTINUE_PUT_AC:
-        
-        END_PUT:
-        RET
-        
-        
-     GET_INDEX_GAMEMAP: ;GENERA UN INDICE PARA MODIFICAR EL MAPA QUE SE VISUALIZA
-        MOV AX, 0
-        MOV DX, 0
-        
-        MOV AL, INDEX_X
-        
-        MOV DL, 4
-        MUL DL
-                
-        MOV DL, AL
-        
-        MOV AX, 0
-        MOV BH, 35
-        MOV AL, INDEX_Y
-        MUL BH
-        
-        ADD AX, 76
-        
-        ADD AX, DX  
-     
-     GET_VAL_MAP:
-        MOV SI, INDEX
-        MOV AL, MAP[SI]
-        RET
-     
-     GET_VAL_GAMEMAP:
-        CALL GET_INDEX_GAMEMAP
-        
-        MOV SI, AX
-        MOV AL, MAP_PRINT[SI]
-        RET
-       
-     CHANGE_VAL_GAMEMAP:  ;TOMA EL VALOR DE CL Y LO INSERTA EN EL STRING EN INDEX_X E INDEX_Y
-        CALL GET_INDEX_GAMEMAP
-        
-        MOV SI, AX
-        MOV MAP_PRINT[SI], DH
-        RET
-     
-     CLEAR_SCREEN:
+    
+    CLEAR_SCREEN: ;LIMPIA LA PANTALLA
         MOV AX, 0003H
         INT 10H
         RET
-     
-     CHANGE_VAL_MAP: ;TOMA EL VALOR DE AL Y LO INSERTA EN MAP EN INDEX
+    
+    GET_VAL_MAP:  ;RETORNA EL VALOR DEL MAPA EN INDEX
+        CALL MAKE_INDEX_MAP
+        MOV SI, INDEX
+        MOV AL, MAP[SI]
+        SUB AL, 30H
+        RET
+    
+    GET_VAL_GAMEMAP: ;RETORNA EL VALOR DEL GAMEMAP EN INDEX
+        CALL MAKE_INDEX_GAMEMAP
+        MOV SI, INDEX
+        MOV AL, GAME_MAP[SI]
+        RET
+        
+    SET_VAL_MAP: ;TOMO EL VALOR EN DH Y LO INSERTA EN EL INDICE DE MAP
+        CALL MAKE_INDEX_MAP
         MOV SI, INDEX
         MOV MAP[SI], DH
-        RET          
-     
-     GET_INDEX: ;OBTIENE EL INDICE PARA EL ARREGLO Y LO GUARDA EN INDEX
+        RET
+    
+    SET_VAL_GAMEMAP: ;TOMA EL VALOR EN DH Y LO INSERTA EN EL INDICE DE GAMEMAP
+        CALL MAKE_INDEX_GAMEMAP
+        MOV SI, INDEX
+        MOV GAME_MAP[SI], DH
+        RET                 
+    
+    SET_VAL_MAPS:
+        CALL SET_VAL_GAMEMAP
+        CALL SET_VAL_MAP
+        RET
+    ;FUNCIONES DE INDICE
+        
+    MAKE_INDEX_GAMEMAP:
+        MOV AX, 0
+        MOV AL, INDEX_X
+        MOV BL, 4
+        MUL BL
+        MOV BL, AL
+        MOV AX,0
         MOV AL, INDEX_Y
-        MOV DL, 07
-        MUL DL
+        MOV BH, 35
+        MUL BH
+        ADD AX, 76
+        MOV BH, 0
+        ADD AX, BX
+        AND INDEX, 0
+        ADD INDEX, AX
+        RET
+        
+    MAKE_INDEX_MAP:
+        MOV AX, 0
+        MOV AL, INDEX_Y
+        MOV BL, 07
+        MUL BL
         ADD AL, INDEX_X
-        MOV DX, INDEX
-        XOR INDEX, DX 
-        ADD INDEX, AX     
-        RET        
-         
-     MAKE_INDEX: ;TRANSFORMA EL INDEX EN POSICIONES X Y Y PARA EL ARREGLO
-        MOV AX, INDEX         
+        AND INDEX, 0
+        ADD INDEX, AX
+        RET
+    
+    MAKE_INDEX:    ;CONVIERTE EL INDICE EN AX EN COORDENADAS X Y Y.
         LOOP_CONVERT:
             CMP AL, 7
             JB CONTINUE_CONVERT
-            MOV CH, 7
-            DIV CH           
-            MOV CL, AL 
+            MOV BH, 7
+            DIV BH
+            MOV BL, AL
             JAE LOOP_CONVERT
         CONTINUE_CONVERT:
+        AND INDEX_X, 0
+        AND INDEX_Y, 0
         
-        MOV CH, INDEX_X
-        XOR INDEX_X, CH
-                      
-        MOV CH, INDEX_Y
-        XOR INDEX_Y, CH
-        
+        ADD INDEX_X, AH
         ADD INDEX_Y, AL
-        ADD INDEX_X, AH     
-                    
-        RET          
-     
-     FLUSH_INDEX:
-        MOV AL, INDEX_Y
-        XOR INDEX_Y, AL
-        MOV AL, INDEX_X
-        XOR INDEX_X, AL
-        MOV AX, INDEX
-        XOR INDEX, AX
-        MOV AX, 00H
         RET
-        
-     GET_RANDOM_SEED: ;GENERA UN NUMERO ALEATORIO BASADO EN LA FECHA Y HORA EN EL ORDENADOR     
-        MOV AX, LAST_RANDOM
-        XOR LAST_RANDOM, AX
-        
+    
+    ;FUNCIONES DE NUMERO ALEATORIO
+    
+    GET_RANDOM: ;GENERA UN NUMERO ALTEARIO BASADO EN LA FECHA Y HORA DEL ORDENADOR
+        AND LAST_RANDOM, 0
         MOV AX, RANDOM
+        ADD LAST_RANDOM, AX
+        AND RANDOM, 0
         
-        ADD LAST_RANDOM, AX        
-        MOV AX, RANDOM
-        XOR RANDOM, AX 
-        
-        MOV AH, 2CH
+        MOV AH, 2CH ;LLAMADO AL SISTEMA PARA OBTENER LA HORA DEL ORDENADOR
         INT 21H
         
-        MOV AH, 0
+        MOV AH, 0        
         
-        ADD AH, CH  
-        SUB AH, DH 
+        ADD AH, CH
+        SUB AH, DH
         
         ADD AL, CL
-        SUB AL, DL
+        SUB AL ,DL
         
         ADD RANDOM, AX
         
-        MOV AH, 2AH
+        MOV AH, 2AH ;LLAMADO AL SISTEMA PARA OBTENER LA FECHA DEL ORDENADOR
         INT 21H
         
         MOV BL, AL
@@ -294,24 +267,19 @@
         
         SUB AX, LAST_RANDOM
         
-        LOOP_CHECK:
+        LOOP_CHECK:  ;SE DIVIDE AL NUMERO HASTA OBTENER UN VALOR ENTRE 0 Y 68
             ADD AL, AH
-            MOV AH, 00
+            MOV AH, 0
             CMP AL, 69
-            JB CONTINUE_CHECK
-            MOV CL, 7
-            DIV CL
-            JAE LOOP_CHECK
+                JB CONTINUE_CHECK
+                
+                MOV BL, 7
+                DIV BL
+                JAE LOOP_CHECK
         CONTINUE_CHECK:
-        
-        MOV AH, 00
-        MOV CX, RANDOM
-        XOR RANDOM, CX
-        
-        ADD RANDOM, CX              
-        
+        MOV AH, 0
+        AND RANDOM, 0
+        ADD RANDOM, AX
         RET
-         
         
-     END:      
-        
+    END:   
