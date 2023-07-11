@@ -49,16 +49,18 @@
   
   MSG_WIN DB "GANASTE, DESTRUISTE TODOS LOS BARCOS ENEMIGOS!", 0DH, 0AH, 24H
   MSG_LOST DB "PERDISTE, TE QUEDASTE SIN MISILES!", 0DH, 0AH, 24H
-  
+                                                                 
+  MSG_CLEANING DB 0DH, 0AH, 0DH, 0AH, "LIMPIANDO MAPA, ESPERE!", 0DH, 0AH, 24H                                                               
+                                                                 
   MSG_TITLE DB "BATALLA NAVAL", 0DH, 0AH
             DB "TIENES 21 MISILES PARA DESTRUIR A LA FLOTA ENEMIGA", 0DH, 0AH
             DB "PRESIONA ENTER PARA VISUALIZAR EL TABLERO Y UBICAR LOS BARCOS ALEATOREAMENTE..", 0DH, 0AH
             DB 24H 
             
-  MSG DB "N PARA SALIR", 0DH, 0AH
+  MSG DB 0DH, 0AH, 0DH, 0AH, "N PARA SALIR", 0DH, 0AH
       DB "S PARA NUEVA PARTIDA", 0DH, 0AH
-      DB "JUGAR DE NUEVO? (S/N):",0DH, 0AH, 24H
-  
+      DB "JUGAR DE NUEVO? (S/N): ", 24H
+    
   MAP DB 69 DUP('0')
   GAME_MAP  DB "X-------------------------------X", 0DH, 0AH
             DB "|   | A | B | C | D | E | F | G |", 0DH, 0AH
@@ -74,15 +76,16 @@
             
 .CODE
 
-    START:
+    START_MAIN:
         MOV AX, @DATA
         MOV DS, AX
                 
         ADD SIZE_AIRCARRIER, 5
         ADD SIZE_CRUISER, 4
-        ADD SIZE_SUBMARINE, 3
+        ADD SIZE_SUBMARINE, 3 
 
         WAIT_FOR_ENTER:
+        
         MOV AX, 0003H
         INT 10H
         MOV AH, 09H
@@ -93,6 +96,7 @@
         CMP AL, 0DH
         JNE WAIT_FOR_ENTER
         
+        AND SHAPE_POINTER, 0
         ADD SHAPE_POINTER, 31H
         AND RANDOM, 0 
         
@@ -286,7 +290,7 @@
                         POP AX
                         CALL MAKE_INDEX 
                         MOV DH, SHAPE_POINTER 
-                        CALL SET_VAL_MAP
+                        CALL SET_VAL_MAPS
                         CMP CL, 0
                         JZ END_PUT
                         DEC CL
@@ -533,15 +537,85 @@
         ADD RANDOM, AX
         RET
         
+    CLEAN_MAPS:    
+        MOV CH, 0 ;Y
+        LOOP_CLEAN_Y:
+            MOV CL, 0 ;X
+            AND INDEX_Y, 0
+            ADD INDEX_Y, CH
+            CMP INDEX_Y, 6
+            JA END_LOOP_CLEAN
+            LOOP_CLEAN_X:
+                AND INDEX_X, 0
+                ADD INDEX_X, CL
+                MOV DH, 30H 
+                CALL SET_VAL_MAP
+                MOV DH, 2EH
+                CALL SET_VAL_GAMEMAP
+                CMP CL, 6
+                JE END_LOOP_CLEAN_X
+                INC CL
+                JB LOOP_CLEAN_X
+            END_LOOP_CLEAN_X:
+                INC CH
+                JMP LOOP_CLEAN_Y
+        END_LOOP_CLEAN:
+        RET
+    
     END_INTE:
     
     END_WIN:
-    
+        MOV AH, 09H
+        LEA DX, [MSG_WIN]
+        INT 21H
+        JMP ASK_END
+        
     END_LOST:
-        MOV AL, SIZE_SUBMARINE
-        MOV BL, SIZE_CRUISER
-        MOV CL, SIZE_AIRCARRIER
-        JMP END
+        MOV AH, 09H
+        LEA DX, [MSG_LOST]
+        INT 21H
+        JMP ASK_END
     
+    ASK_END:
+        MOV AH, 09H
+        LEA DX, [MSG]
+        INT 21H
+        
+        MOV AH, 01H
+        INT 21H
+        MOV DX, 0
+        
+        CMP AL, 4EH
+        JE END
+        
+        CMP AL, 53H
+        JE CLEAN
+        JNE ASK_END
+        
+    CLEAN:
+        AND SIZE_AIRCARRIER, 0
+        AND SIZE_CRUISER, 0
+        AND SIZE_SUBMARINE, 0
+        
+        ADD SIZE_AIRCARRIER, 5
+        ADD SIZE_CRUISER, 4
+        ADD SIZE_SUBMARINE, 3
+        
+        AND RANDOM, 0
+        AND POS_AIRCARRIER, 0
+        AND POS_SUBMARINE, 0
+        AND POS_CRUISER, 0
+        AND POS_SHIP, 0
+        
+        AND QTY_MISSILE, 0
+        
+        MOV AH, 09H
+        LEA DX, [MSG_CLEANING]
+        INT 21H
+        
+        CALL CLEAN_MAPS
+         
+        JMP WAIT_FOR_ENTER
+        
     END:
        
