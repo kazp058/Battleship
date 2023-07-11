@@ -295,7 +295,7 @@
                         POP AX
                         CALL MAKE_INDEX 
                         MOV DH, SHAPE_POINTER 
-                        CALL SET_VAL_MAPS
+                        CALL SET_VAL_MAP
                         CMP CL, 0
                         JZ END_PUT
                         DEC CL
