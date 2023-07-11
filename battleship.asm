@@ -47,12 +47,13 @@
   MSG_SCRU DB "CRUCERO HUNDIDO!", 0DH, 0AH, 24H
   MSG_SACC DB "PORTAAVIONES HUNDIDO!", 0DH, 0AH, 24H 
   
-  MSG_WIN DB "GANASTE, DESTRUISTE TODOS LOS BARCOS ENEMIGOS!", 0DH, 0AH, 24H
-  MSG_LOST DB "PERDISTE, TE QUEDASTE SIN MISILES!", 0DH, 0AH, 24H
+  MSG_WIN DB 0DH, 0AH, "GANASTE, DESTRUISTE TODOS LOS BARCOS ENEMIGOS!", 0DH, 0AH, 24H
+  MSG_LOST DB 0DH, 0AH, "PERDISTE, TE QUEDASTE SIN MISILES!", 0DH, 0AH, 24H
+  MSG_STOP DB 0DH, 0AH, "JUEGO DETENIDO, GRACIAS POR JUGAR!", 0DH, 0AH, 24H
                                                                  
   MSG_CLEANING DB 0DH, 0AH, 0DH, 0AH, "LIMPIANDO MAPA, ESPERE!", 0DH, 0AH, 24H                                                               
                                                                  
-  MSG_TITLE DB "BATALLA NAVAL", 0DH, 0AH
+  MSG_TITLE DB 0DH, 0AH, "BATALLA NAVAL", 0DH, 0AH
             DB "TIENES 21 MISILES PARA DESTRUIR A LA FLOTA ENEMIGA", 0DH, 0AH
             DB "PRESIONA ENTER PARA VISUALIZAR EL TABLERO Y UBICAR LOS BARCOS ALEATOREAMENTE..", 0DH, 0AH
             DB 24H 
@@ -91,8 +92,10 @@
         MOV AH, 09H
         LEA DX, [MSG_TITLE]
         INT 21H
+        CALL CHECK_INT
         MOV AH, 01H
         INT 21H
+        CALL CHECK_INT
         CMP AL, 0DH
         JNE WAIT_FOR_ENTER
         
@@ -149,13 +152,15 @@
             MOV BL, SIZE_SUBMARINE
             MOV CL, SIZE_CRUISER
             MOV DL, SIZE_AIRCARRIER 
-             
+            CALL CHECK_INT 
             MOV AH, 01H
             INT 21H
             MOV BH, AL
+            CALL CHECK_INT
             MOV AH, 01H
             INT 21H
             MOV BL, AL
+            CALL CHECK_INT
         
         CMP BH, 41H
         JB INVALID
@@ -382,7 +387,14 @@
             LEA DX, [MSG_SACC]
             INT 21H
             JMP AFTER_SHOT
-
+    
+    CHECK_INT:
+        MOV AH, 01H
+        INT 16H
+        CMP AL, 5H
+        JE END_INTE
+        RET
+    
     ;FUNCIONES DE MAPA
         
     PRINT_MAP: ;IMPRIME EL MAPA DEL JUEGO
@@ -563,6 +575,10 @@
         RET
     
     END_INTE:
+        MOV AH, 09H
+        LEA DX, [MSG_STOP]
+        INT 21H
+        JMP END
     
     END_WIN:
         MOV AH, 09H
